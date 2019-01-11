@@ -1,0 +1,76 @@
+language: go
+sudo: false
+
+go:
+  - "1.10"
+
+env:
+  global:
+    - VERSION=$(cat VERSION)
+
+# Skip the install step. Don't `go get` dependencies. Only build with the code
+# in vendor/
+#install: true
+
+# email me the results of the test runs.
+notifications:
+  email: true
+
+before_install:
+#  - find "${GOPATH%%:*}" -name '*.a' -delete
+#  - rm -rf "${GOPATH%%:*}/src/golang.org"
+#  - rm -rf "${GOPATH%%:*}/src/github.com"
+  - cd
+  - go get -u -v golang.org/x/crypto/bcrypt
+  - go get -u -v github.com/mattn/go-sqlite3
+  - go get -u -v github.com/spf13/viper
+  - go get -u -v github.com/spf13/cobra
+  - go get -u -v github.com/olekukonko/tablewriter
+  - go get -u -v github.com/sirupsen/logrus
+  - go get -u -v github.com/jmoiron/sqlx
+
+# Anything in before_script that returns a nonzero exit code will flunk the
+# build and immediately stop. It's sorta like having set -e enabled in bash.
+# Make sure golangci-lint is vendored by running
+#   dep ensure -add github.com/golangci/golangci-lint/cmd/golangci-lint
+# ...and adding this to your Gopkg.toml file.
+#   required = ["github.com/golangci/golangci-lint/cmd/golangci-lint"]
+#
+# before_script:
+# - go install ./vendor/github.com/golangci/golangci-lint/cmd/golangci-lint
+
+install:
+  - go get -u -v github.com/pkg/errors
+
+script:
+  - cd $HOME/gopath/src/github.com/swordlordcodingcrew/bunny-express
+  - mkdir build
+  - GOPATH="$HOME/gopath/src/github.com/swordlordcodingcrew/bunny-express:/home/travis/gopath"
+  - go build -o build/be-v$VERSION -gcflags "all=-N -l" swordlord.com/bunny-express
+#  - make
+#  go test -v swordlord.com/bunnyexpress
+
+# With this configuration the build itself runs for every commit and PR
+# (which is nice, because we see if everything compiles fine), but the
+# deployment only happens when we actually push a tag as well containing
+# the version number of the new release.
+#
+# deploy:
+#   provider: releases
+#   skip_cleanup: true # Important, otherwise the build output would be purged.
+#   api_key:
+#     secure: lFGBaF...SJ1lDPDICY=
+#   file: bin/myawesomeapp
+#   on:
+#     repo: account/myawesomeproject
+#     tags: true # The deployment happens only if the commit has a tag.
+
+deploy:
+  provider: releases
+  file:
+    - build/be-v$VERSION
+  api_key:
+    secure: = xxx
+  skip_cleanup: true
+  on:
+    tags: false
