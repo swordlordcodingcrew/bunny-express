@@ -33,6 +33,7 @@ package cmd
 -----------------------------------------------------------------------------*/
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/spf13/cobra"
 	"strconv"
@@ -42,7 +43,27 @@ import (
 
 func ListAliases(cmd *cobra.Command, args []string) error {
 
-	aa, err := alias.GetAllAliases()
+	af := alias.AliasFilter{}
+
+	fIsActive := cmd.Flag("active")
+	if fIsActive.Changed {
+		bIsActive, err := strconv.ParseBool(fIsActive.Value.String())
+		if err == nil {
+			af.IsActive.Scan(bIsActive)
+		}
+	}
+
+	fDomain := cmd.Flag("domain")
+	if fDomain.Changed {
+		af.Domain = fDomain.Value.String()
+	}
+
+	fForward := cmd.Flag("forward")
+	if fForward.Changed {
+		af.ForwardAddress = fForward.Value.String()
+	}
+
+	aa, err := alias.GetFilteredAliases(&af)
 	if err != nil {
 		return fmt.Errorf("command 'list' returns an error %s", err)
 	}
@@ -61,60 +82,49 @@ func ListAliases(cmd *cobra.Command, args []string) error {
 
 func AddAlias(cmd *cobra.Command, args []string) error {
 
-	a := alias.Alias{}
+	a := alias.NewAlias()
 
-	a.Alias = args[0]
+	a.SetAlias(args[0])
+	a.SetDomain(args[1])
+	a.SetForwardAddress(args[2])
 
-	fActive := cmd.Flag("active")
-	b, err := strconv.ParseBool(fActive.Value.String())
-	if err == nil {
-		a.IsActive = b
-	}
+	scanAliasFlagsToObject(cmd, a)
 
-	fDesc := cmd.Flag("description")
-	if fDesc.Changed {
-
-		a.Description.String = fDesc.Value.String()
-	}
-
-	return alias.AddAlias(a)
+	return a.Persist()
 }
 
 func EditAlias(cmd *cobra.Command, args []string) error {
 
-	m, err := alias.GetAlias(args[0])
+	a, err := alias.GetAlias(args[0])
 	if err != nil {
 		return fmt.Errorf("command 'edit' returns an error %s", err)
 	}
 
-	// todo: dont do it like that, keep dirty flags per field on the struct
-	isDirty := false
+	scanAliasFlagsToObject(cmd, a)
+
+	return a.Persist()
+}
+
+func scanAliasFlagsToObject(cmd *cobra.Command, a *alias.Alias) {
 
 	fActive := cmd.Flag("active")
 	if fActive.Changed {
 
 		b, err := strconv.ParseBool(fActive.Value.String())
 		if err == nil {
-			m.IsActive = b
-			isDirty = true
+			a.SetIsActive(b)
 		}
 	}
 
 	fDesc := cmd.Flag("description")
 	if fDesc.Changed {
 
-		m.Description.String = fDesc.Value.String()
-		isDirty = true
+		var s = sql.NullString{}
+		err := s.Scan(fDesc.Value.String())
+		if err == nil {
+			a.SetDescription(s)
+		}
 	}
-
-	if isDirty {
-		err = alias.EditAlias(m)
-	} else {
-		err = fmt.Errorf("nothing to change")
-	}
-
-	return err
-
 }
 
 func DeleteAlias(cmd *cobra.Command, args []string) error {
@@ -138,7 +148,9 @@ func init() {
 		Long:  `List aliases based on filter given. Name of alias can have wildcard.`,
 		RunE:  ListAliases,
 	}
-	aliasListCmd.Flags().BoolP("active", "a", true, "is alias active")
+	aliasListCmd.Flags().BoolP("active", "a", true, "is alias active?")
+	aliasListCmd.Flags().StringP("domain", "d", "", "alias for which domain")
+	aliasListCmd.Flags().StringP("forward", "f", "", "alias pointing to which forward address")
 
 	var aliasAddCmd = &cobra.Command{
 		Use:   "add [alias] [domain] [forward_address]",

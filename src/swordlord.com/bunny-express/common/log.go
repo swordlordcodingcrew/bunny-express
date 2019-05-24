@@ -34,11 +34,13 @@ package common
 
 import (
 	log "github.com/sirupsen/logrus"
+	"os"
 )
 
 func InitLog() {
 
 	level, err := log.ParseLevel(GetLogLevel())
+	log.SetOutput(os.Stdout)
 
 	if err != nil {
 

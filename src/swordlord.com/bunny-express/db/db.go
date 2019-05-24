@@ -49,18 +49,21 @@ CREATE TABLE domain (
 var createMailboxTbl = `
 CREATE TABLE mailbox (
   mail varchar(255) PRIMARY KEY,
+  pwd varchar(255) NOT NULL,
+  pwd_legacy varchar(255) NOT NULL,
   desc varchar(2000),
+  local_part varchar(255) NOT NULL,
   domain varchar(255) NOT NULL,
-  pwd varchar(2000) NOT NULL,
-  mail_dir varchar(2000) NOT NULL,
-  local_part varchar(500) NOT NULL,
-  relay_domain varchar(500),
-  quota varchar(100),
+  mail_dir varchar(255) NOT NULL,
+  quota INTEGER DEFAULT 0,
   active bool DEFAULT true,
   crt_dat timestamp DEFAULT CURRENT_TIMESTAMP,
   upd_dat timestamp DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT mailbox_domain_fk FOREIGN KEY (domain) REFERENCES domain (domain)
 );`
+
+// did contain relay_domain varchar(500),
+//
 
 var createAliasTbl = `
 CREATE TABLE alias (

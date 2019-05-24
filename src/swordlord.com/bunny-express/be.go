@@ -69,5 +69,5 @@ func main() {
 }
 
 // TODO: alias -> forward -> multi line, one line per address
-// TODO: @ in alias == catchall? -> entsprechend in sql noch anpassen
+// TODO: @ in alias == catchall? -> fix in sql syntax
 // TODO: remove logrus, doesnt make sense in a cli tool...

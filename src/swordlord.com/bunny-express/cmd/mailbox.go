@@ -33,6 +33,7 @@ package cmd
 -----------------------------------------------------------------------------*/
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/spf13/cobra"
 	"strconv"
@@ -42,14 +43,29 @@ import (
 
 func ListMailbox(cmd *cobra.Command, args []string) error {
 
-	m, err := mailbox.GetAllMailboxen()
+	mbf := mailbox.MailboxFilter{}
+
+	fIsActive := cmd.Flag("active")
+	if fIsActive.Changed {
+		bIsActive, err := strconv.ParseBool(fIsActive.Value.String())
+		if err == nil {
+			mbf.IsActive.Scan(bIsActive)
+		}
+	}
+
+	fDomain := cmd.Flag("domain")
+	if fDomain.Changed {
+		mbf.Domain = fDomain.Value.String()
+	}
+
+	ms, err := mailbox.GetFilteredMailbox(&mbf)
 	if err != nil {
 		return fmt.Errorf("command 'list' returns an error %s", err)
 	}
 
 	var mailboxen [][]string
 
-	for _, mb := range m {
+	for _, mb := range ms {
 
 		mailboxen = append(mailboxen, []string{mb.Mail, mb.Description.String, mb.Domain, mb.Password, mb.MailDir,
 			mb.LocalPart, mb.RelayDomain.String, mb.Quota.String,
@@ -65,23 +81,24 @@ func ListMailbox(cmd *cobra.Command, args []string) error {
 
 func AddMailbox(cmd *cobra.Command, args []string) error {
 
-	m := mailbox.Mailbox{}
+	m := mailbox.NewMailbox()
 
-	m.Domain = args[0]
+	m.SetMail(args[0])
+	m.SetPassword(args[1])
+	m.SetDomain(args[2])
 
-	fActive := cmd.Flag("active")
-	b, err := strconv.ParseBool(fActive.Value.String())
+	m.SetMailDir("")
+	m.SetLocalPart("")
+
+	var q = sql.NullString{}
+	err := q.Scan("0")
 	if err == nil {
-		m.IsActive = b
+		m.SetQuota(q)
 	}
 
-	fDesc := cmd.Flag("description")
-	if fDesc.Changed {
+	scanMailboxFlagsToObject(cmd, m)
 
-		m.Description.String = fDesc.Value.String()
-	}
-
-	return mailbox.AddMailbox(m)
+	return m.Persist()
 }
 
 func EditMailbox(cmd *cobra.Command, args []string) error {
@@ -91,34 +108,70 @@ func EditMailbox(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("command 'edit' returns an error %s", err)
 	}
 
-	// todo: dont do it like that, keep dirty flags per field on the struct
-	isDirty := false
+	scanMailboxFlagsToObject(cmd, m)
+
+	return m.Persist()
+}
+
+func scanMailboxFlagsToObject(cmd *cobra.Command, m *mailbox.Mailbox) {
 
 	fActive := cmd.Flag("active")
 	if fActive.Changed {
 
 		b, err := strconv.ParseBool(fActive.Value.String())
 		if err == nil {
-			m.IsActive = b
-			isDirty = true
+			m.SetIsActive(b)
 		}
 	}
 
 	fDesc := cmd.Flag("description")
 	if fDesc.Changed {
 
-		m.Description.String = fDesc.Value.String()
-		isDirty = true
+		var s = sql.NullString{}
+		err := s.Scan(fDesc.Value.String())
+		if err == nil {
+			m.SetDescription(s)
+		}
 	}
 
-	if isDirty {
-		err = mailbox.EditMailbox(m)
-	} else {
-		err = fmt.Errorf("nothing to change")
+	// check for nil since this flag is not used in all commands
+	fPassword := cmd.Flag("password")
+	if fPassword != nil && fPassword.Changed {
+
+		m.SetPassword(fPassword.Value.String())
 	}
 
-	return err
+	fMaildir := cmd.Flag("maildir")
+	if fMaildir.Changed {
 
+		m.SetMailDir(fMaildir.Value.String())
+	}
+
+	fLocalPart := cmd.Flag("localpart")
+	if fLocalPart.Changed {
+
+		m.SetLocalPart(fLocalPart.Value.String())
+	}
+
+	fRelayDomain := cmd.Flag("relaydomain")
+	if fRelayDomain.Changed {
+
+		var s = sql.NullString{}
+		err := s.Scan(fRelayDomain.Value.String())
+		if err == nil {
+			m.SetRelayDomain(s)
+		}
+	}
+
+	fQuota := cmd.Flag("quota")
+	if fQuota.Changed {
+
+		var s = sql.NullString{}
+		err := s.Scan(fQuota.Value.String())
+		if err == nil {
+			m.SetQuota(s)
+		}
+	}
 }
 
 func DeleteMailbox(cmd *cobra.Command, args []string) error {
@@ -143,6 +196,7 @@ func init() {
 		RunE:  ListMailbox,
 	}
 	mailboxListCmd.Flags().BoolP("active", "a", true, "is mailbox active")
+	mailboxListCmd.Flags().StringP("domain", "d", "", "mailbox for which domain")
 
 	var mailboxAddCmd = &cobra.Command{
 		Use:   "add [mailbox] [password] [domain]",
