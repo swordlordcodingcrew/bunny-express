@@ -33,6 +33,7 @@ package cmd
 -----------------------------------------------------------------------------*/
 
 import (
+	"database/sql"
 	"flag"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
@@ -47,7 +48,22 @@ import (
 
 func ListDomain(cmd *cobra.Command, args []string) error {
 
-	d, err := domain.GetAllDomains()
+	df := domain.DomainFilter{}
+
+	fIsActive := cmd.Flag("active")
+	if fIsActive.Changed {
+		bIsActive, err := strconv.ParseBool(fIsActive.Value.String())
+		if err == nil {
+			df.IsActive.Scan(bIsActive)
+		}
+	}
+
+	fDomain := cmd.Flag("domain")
+	if fDomain.Changed {
+		df.Domain = fDomain.Value.String()
+	}
+
+	d, err := domain.GetFilteredDomains(&df)
 	if err != nil {
 		return fmt.Errorf("command 'list' returns an error %s", err)
 	}
@@ -56,10 +72,10 @@ func ListDomain(cmd *cobra.Command, args []string) error {
 
 	for _, domain := range d {
 
-		domains = append(domains, []string{domain.Domain, domain.Description.String,
-			strconv.Itoa(domain.Mailbox),
-			strconv.Itoa(domain.Alias),
-			strconv.FormatBool(domain.IsActive),
+		domains = append(domains, []string{domain.GetDomain(), domain.GetDescription().String,
+			strconv.Itoa(domain.GetMailboxCount()),
+			strconv.Itoa(domain.GetAliasCount()),
+			strconv.FormatBool(domain.GetIsActive()),
 			domain.CrtDat.Format("2006-01-02 15:04:05"),
 			domain.UpdDat.Format("2006-01-02 15:04:05")})
 	}
@@ -71,34 +87,24 @@ func ListDomain(cmd *cobra.Command, args []string) error {
 
 func AddDomain(cmd *cobra.Command, args []string) error {
 
-	d := domain.Domain{}
+	d := domain.NewDomain()
 
-	d.Domain = args[0]
+	d.SetDomain(args[0])
 
-	fActive := cmd.Flag("active")
-	b, err := strconv.ParseBool(fActive.Value.String())
-	if err == nil {
-		d.IsActive = b
-	}
+	scanDomainFlagsToObject(cmd, d)
 
-	fDesc := cmd.Flag("description")
-	if fDesc.Changed {
-
-		d.Description.String = fDesc.Value.String()
-	}
-
-	err = domain.AddDomain(d)
+	err := d.Persist()
 	if err != nil {
 		return err
 	}
 
 	fFillDefaultAlias := cmd.Flag("fill")
-	b, err = strconv.ParseBool(fFillDefaultAlias.Value.String())
-	if b {
+	bFill, err := strconv.ParseBool(fFillDefaultAlias.Value.String())
+	if bFill {
 
 		err = alias.FillDefaultAliasOnDomain(d.Domain)
 		if err != nil {
-			common.LogInfo("Could not automatically create Alias.", logrus.Fields{"domain": d.Domain, "error": err})
+			common.LogInfo("Could not automatically create alias.", logrus.Fields{"domain": d.Domain, "error": err})
 			return err
 		}
 	}
@@ -113,33 +119,31 @@ func EditDomain(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("command 'edit' returns an error %s", err)
 	}
 
-	// todo: dont do it like that, keep dirty flags per field on the struct
-	isDirty := false
+	scanDomainFlagsToObject(cmd, d)
+
+	return d.Persist()
+}
+
+func scanDomainFlagsToObject(cmd *cobra.Command, d *domain.Domain) {
 
 	fActive := cmd.Flag("active")
 	if fActive.Changed {
 
 		b, err := strconv.ParseBool(fActive.Value.String())
 		if err == nil {
-			d.IsActive = b
-			isDirty = true
+			d.SetIsActive(b)
 		}
 	}
 
 	fDesc := cmd.Flag("description")
 	if fDesc.Changed {
 
-		d.Description.String = fDesc.Value.String()
-		isDirty = true
+		var s = sql.NullString{}
+		err := s.Scan(fDesc.Value.String())
+		if err == nil {
+			d.SetDescription(s)
+		}
 	}
-
-	if isDirty {
-		err = domain.EditDomain(d)
-	} else {
-		err = fmt.Errorf("nothing to change")
-	}
-
-	return err
 }
 
 func DeleteDomain(cmd *cobra.Command, args []string) error {
@@ -164,6 +168,7 @@ func init() {
 		RunE:  ListDomain,
 	}
 	domainListCmd.Flags().BoolP("active", "a", true, "is domain active")
+	domainListCmd.Flags().StringP("domain", "d", "", "mailbox for which domain")
 
 	var domainAddCmd = &cobra.Command{
 		Use:   "add [domain]",

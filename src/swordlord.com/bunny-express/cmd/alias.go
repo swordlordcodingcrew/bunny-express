@@ -137,16 +137,17 @@ func init() {
 	// calCmd represents the domain command
 	var aliasCmd = &cobra.Command{
 		Use:   "alias",
-		Short: "Add, change and manage aliases.",
+		Short: "Add, change and manage aliases",
 		Long:  `Add, change and manage aliases. Requires a subcommand.`,
 		RunE:  nil,
 	}
 
 	var aliasListCmd = &cobra.Command{
 		Use:   "list",
-		Short: "List aliases.",
-		Long:  `List aliases based on filter given. Name of alias can have wildcard.`,
-		RunE:  ListAliases,
+		Short: "List aliases",
+		Long: `List aliases based on filter given. Name of alias can have 
+wildcard character to return all matching aliases.`,
+		RunE: ListAliases,
 	}
 	aliasListCmd.Flags().BoolP("active", "a", true, "is alias active?")
 	aliasListCmd.Flags().StringP("domain", "d", "", "alias for which domain")
@@ -157,7 +158,8 @@ func init() {
 		Short: "Add new alias to given domain",
 		Long: `Add new alias with parameters given and add it to the given domain.
 
-The forward_address can contain multiple addresses. Please make sure to add an empty character between the addresses`,
+The field forward_address can contain multiple addresses. 
+Please make sure to add a blank between the addresses.`,
 		Args: cobra.ExactArgs(3),
 		RunE: AddAlias,
 	}
@@ -171,7 +173,7 @@ The forward_address can contain multiple addresses. Please make sure to add an e
 	var aliasEditCmd = &cobra.Command{
 		Use:   "edit [alias]",
 		Short: "Edit an existing alias",
-		Long:  `Edit.`,
+		Long:  `Edit an existing alias. Will return an error if alias is not found.`,
 		Args:  cobra.ExactArgs(1),
 		RunE:  EditAlias,
 	}
@@ -185,8 +187,8 @@ The forward_address can contain multiple addresses. Please make sure to add an e
 
 	var aliasDeleteCmd = &cobra.Command{
 		Use:   "delete [alias]",
-		Short: "Deletes a alias.",
-		Long:  `Deletes a alias.`,
+		Short: "Delete the given alias",
+		Long:  `Delete the given alias. Will return an error if alias is not found.`,
 		Args:  cobra.ExactArgs(1),
 		RunE:  DeleteAlias,
 	}

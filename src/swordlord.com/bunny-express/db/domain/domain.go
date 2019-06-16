@@ -34,25 +34,95 @@ package domain
 
 import (
 	"database/sql"
+	"errors"
+	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
+	"strconv"
+	"strings"
 	"swordlord.com/bunny-express/common"
 	"swordlord.com/bunny-express/db"
 	"time"
 )
 
 type Domain struct {
-	Domain      string         `db:"domain"`
-	Description sql.NullString `db:"desc"`
-	Mailbox     int            `db:"mailbox"`
-	Alias       int            `db:"alias"`
-	IsActive    bool           `db:"active"`
-	CrtDat      time.Time      `db:"crt_dat"`
-	UpdDat      time.Time      `db:"upd_dat"`
+	Domain          string         `db:"domain"`
+	Description     sql.NullString `db:"desc"`
+	isDescDirty     bool
+	MailboxCount    int  `db:"mailbox_count"` // dynamically loaded, not stored
+	AliasCount      int  `db:"alias_count"`   // dynamically loaded, not stored
+	IsActive        bool `db:"active"`
+	isIsActiveDirty bool
+	// tells us if object is from db or not
+	isNew  bool
+	CrtDat time.Time `db:"crt_dat"`
+	UpdDat time.Time `db:"upd_dat"`
+}
+
+func NewDomain() *Domain {
+
+	d := &Domain{}
+	d.clearDirtyFlags()
+	d.isNew = true
+	d.MailboxCount = 0
+	d.AliasCount = 0
+
+	return d
+}
+
+func (m *Domain) clearDirtyFlags() {
+	m.isDescDirty = false
+	m.isIsActiveDirty = false
+}
+
+func (d *Domain) GetDomain() string              { return d.Domain }
+func (d *Domain) GetDescription() sql.NullString { return d.Description }
+func (d *Domain) GetMailboxCount() int           { return d.MailboxCount }
+func (d *Domain) GetAliasCount() int             { return d.AliasCount }
+func (d *Domain) GetIsActive() bool              { return d.IsActive }
+
+func (d *Domain) SetDomain(domain string) {
+	d.Domain = domain
+}
+
+func (d *Domain) SetDescription(description sql.NullString) {
+
+	// TODO: add sanity check to all SetXY functions
+	if d.Description.String == description.String {
+		return
+	}
+
+	d.Description = description
+	d.isDescDirty = true
+}
+
+func (d *Domain) SetIsActive(ia bool) {
+
+	if d.IsActive == ia {
+		return
+	}
+
+	d.IsActive = ia
+	d.isIsActiveDirty = true
+}
+
+func (d *Domain) IsDirty() bool {
+	if d.isDescDirty ||
+		d.isIsActiveDirty {
+		return true
+	} else {
+		return false
+	}
+}
+
+type DomainFilter struct {
+	Domain      string
+	Description string
+	IsActive    sql.NullBool
 }
 
 func GetFieldCaptions() []string {
 
-	captions := []string{"Domain", "Description", "Mailbox", "Alias", "Active", "Created", "Updated"}
+	captions := []string{"Domain", "Description", "MailboxCount", "AliasCount", "Active", "Created", "Updated"}
 
 	return captions
 }
@@ -68,8 +138,8 @@ func GetAllDomains() ([]Domain, error) {
 	q := `SELECT 
 			  domain, 
 			  desc,  
-			  (SELECT count(mail) FROM mailbox WHERE mailbox.domain = domain.domain) as mailbox,
-			  (SELECT count(alias) FROM alias WHERE alias.domain = domain.domain) as alias,
+			  (SELECT count(mail) FROM mailbox WHERE mailbox.domain = domain.domain) as mailbox_count,
+			  (SELECT count(alias) FROM alias WHERE alias.domain = domain.domain) as alias_count,
 			  active,
 			  crt_dat,
 			  upd_dat
@@ -88,26 +158,243 @@ func GetAllDomains() ([]Domain, error) {
 	return d, err
 }
 
-func GetDomain(name string) (Domain, error) {
+func GetFilteredDomains(df *DomainFilter) ([]Domain, error) {
 
 	db, err := db.OpenDB()
 	if err != nil {
-		return Domain{}, err
+		return nil, err
 	}
 	defer db.Close()
 
-	stmt, err := db.Preparex(`SELECT * FROM domain WHERE domain=?`)
-	if err != nil {
-		return Domain{}, err
+	sFilter := ""
+	params := []string{}
+
+	if len(df.Domain) > 0 {
+		sFilter += "domain LIKE ?"
+		params = append(params, df.Domain)
 	}
 
-	var d Domain
-	err = stmt.Get(&d, name)
+	if df.IsActive.Valid {
+		if len(sFilter) > 0 {
+			sFilter += " AND "
+		}
+		sFilter += "active = ?"
+		params = append(params, strconv.FormatBool(df.IsActive.Bool))
+	}
+
+	if len(sFilter) > 0 {
+		sFilter = "WHERE " + sFilter
+	}
+
+	sql := `SELECT 
+			  domain, 
+			  desc,  
+			  (SELECT count(mail) FROM mailbox WHERE mailbox.domain = domain.domain) as mailbox_count,
+			  (SELECT count(alias) FROM alias WHERE alias.domain = domain.domain) as alias_count,
+			  active,
+			  crt_dat,
+			  upd_dat
+		  FROM 
+		  	  domain ` + sFilter + ` 
+		  ORDER BY domain ASC`
+
+	stmt, err := db.Preparex(sql)
 	if err != nil {
-		return Domain{}, err
+		return nil, err
+	}
+
+	// slice of interface != slice of string, which is why we copy the values to a slice of interfaces
+	args := make([]interface{}, len(params))
+	for i, s := range params {
+		args[i] = s
+	}
+
+	// select function accepts a slice of interface as variadic, neat
+	var d []Domain
+	err = stmt.Select(&d, args...)
+
+	if err == nil {
+		for i := range d {
+			d[i].isNew = false
+		}
+	}
+
+	return d, err
+}
+
+func GetDomain(domain string) (*Domain, error) {
+
+	db, err := db.OpenDB()
+	if err != nil {
+		return NewDomain(), err
+	}
+	defer db.Close()
+
+	stmt, err := db.Preparex(db.Rebind("SELECT * FROM domain WHERE domain=?"))
+	if err != nil {
+		return NewDomain(), err
+	}
+
+	d := NewDomain()
+	err = stmt.Get(d, domain)
+	if err != nil {
+		return NewDomain(), err
 	} else {
+		d.isNew = false
 		return d, nil
 	}
+}
+
+func (d *Domain) Persist() error {
+
+	db, err := db.OpenDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	if !d.IsDirty() {
+		common.LogInfo("Domain did not change, not persisted.", nil)
+		return nil
+	}
+
+	if d.isNew {
+		err = d.add(db)
+	} else {
+		err = d.update(db)
+	}
+
+	return err
+}
+
+// called by d.Persist, never call directly
+func (d *Domain) add(db *sqlx.DB) error {
+
+	sFields := ""
+	var params []interface{}
+
+	if d.isNew {
+		sFields += "domain"
+		params = append(params, d.Domain)
+	}
+
+	if d.isDescDirty {
+		if len(sFields) > 0 {
+			sFields += ", "
+		}
+		sFields += "desc"
+		params = append(params, d.Description.String)
+	}
+
+	if d.isIsActiveDirty {
+		if len(sFields) > 0 {
+			sFields += ", "
+		}
+		sFields += "active"
+		params = append(params, d.GetIsActive())
+	}
+
+	// generate param string, remove last , from repeater
+	sQM := strings.Repeat("?,", len(params))
+	sQM = sQM[:len(sQM)-1]
+
+	stmt, err := db.Preparex("INSERT INTO domain (" + sFields + ") VALUES (" + sQM + ")")
+	if err != nil {
+		return err
+	}
+
+	res, err := stmt.Exec(params...)
+	if err != nil {
+		return err
+	}
+
+	count, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	fields := logrus.Fields{"domain": d.Domain, "description": d.Description, "active": d.IsActive}
+
+	d.clearDirtyFlags()
+
+	if count == 0 {
+		common.LogInfo("Nothing done.", fields)
+	} else {
+		common.LogInfo("Domain added.", fields)
+	}
+
+	return nil
+}
+
+// called by a.Persist, never call directly
+func (d *Domain) update(db *sqlx.DB) error {
+
+	if !d.IsDirty() {
+		return errors.New("trying to update unchanged object")
+	}
+
+	sStatement := ""
+	var params []interface{}
+
+	// d.Description, d.IsActive, time.Now(), a.UpdDat
+	if d.isDescDirty {
+		if len(sStatement) > 0 {
+			sStatement += ", "
+		}
+		sStatement += "desc = ?"
+		params = append(params, d.Description.String)
+	}
+
+	if d.isIsActiveDirty {
+		if len(sStatement) > 0 {
+			sStatement += ", "
+		}
+		sStatement += "active = ?"
+		params = append(params, d.GetIsActive())
+	}
+
+	// update upddat field
+	if len(sStatement) > 0 {
+		sStatement += ", "
+	}
+	sStatement += "upd_dat = ?"
+	params = append(params, time.Now())
+
+	// append params for where
+	params = append(params, d.Domain) // pkey
+	params = append(params, d.UpdDat) // optimistic locking
+
+	stmt, err := db.Preparex("UPDATE domain SET " + sStatement + " WHERE domain = ? AND upd_dat <= ?")
+	if err != nil {
+		return err
+	}
+
+	res, err := stmt.Exec(params...)
+	if err != nil {
+		return err
+	}
+
+	count, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	fields := logrus.Fields{"domain": d.Domain, "description": d.Description, "active": d.IsActive}
+
+	d.clearDirtyFlags()
+
+	if count == 0 {
+		common.LogInfo("Nothing done.", fields)
+	} else {
+		common.LogInfo("Alias updated.", fields)
+	}
+
+	return nil
+}
+
+func (d Domain) Delete() error {
+
+	return DeleteDomain(d.Domain)
 }
 
 func AddDomain(d Domain) error {

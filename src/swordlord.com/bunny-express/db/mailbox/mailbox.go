@@ -33,16 +33,23 @@ package mailbox
 -----------------------------------------------------------------------------*/
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
+	"io"
 	"strconv"
 	"strings"
 	"swordlord.com/bunny-express/common"
 	"swordlord.com/bunny-express/db"
 	"time"
+)
+
+const (
+	PW_SALT_BYTES = 4
 )
 
 type Mailbox struct {
@@ -74,6 +81,8 @@ func NewMailbox() *Mailbox {
 	m := &Mailbox{}
 	m.clearDirtyFlags()
 	m.isNew = true
+	m.SetQuota(0)
+	m.SetIsActive(true)
 
 	return m
 }
@@ -119,15 +128,36 @@ func (m *Mailbox) SetDomain(domain string) {
 	m.isDomainDirty = true
 }
 
-func (m *Mailbox) SetPassword(password string) error {
+func (m *Mailbox) SetPasswordWDefaultScheme(password string) error {
+	return m.SetPassword(password, "")
+}
 
-	// TODO; add check
-	pwd, err := generatePassword(password)
+func (m *Mailbox) SetPassword(password string, scheme string) error {
+
+	if scheme == "" {
+		scheme = "BLF-CRYPT"
+	}
+
+	hash := ""
+	var err error
+
+	switch scheme {
+	case "BLF-CRYPT":
+		hash, err = common.HashPasswordBCrypt(password)
+	default:
+		salt := make([]byte, PW_SALT_BYTES)
+		_, err = io.ReadFull(rand.Reader, salt)
+		if err != nil {
+			return err
+		}
+		hash, err = common.HashPasswordMD5Crypt(password, hex.EncodeToString(salt))
+	}
+
 	if err != nil {
 		return err
 	}
 
-	m.Password = pwd
+	m.Password = "{" + scheme + "}" + hash
 	m.isPasswordDirty = true
 
 	return nil
@@ -148,7 +178,12 @@ func (m *Mailbox) SetRelayDomain(relayDomain sql.NullString) {
 	m.isRelayDomainDirty = true
 }
 
-func (m *Mailbox) SetQuota(quota sql.NullString) {
+func (m *Mailbox) SetQuota(quota int) {
+	m.Quota.Scan(quota)
+	m.isQuotaDirty = true
+}
+
+func (m *Mailbox) SetQuotaAsNullString(quota sql.NullString) {
 	m.Quota = quota
 	m.isQuotaDirty = true
 }
@@ -576,7 +611,7 @@ func FillDefaultMailboxOnDomain(domain string) error {
 		m := NewMailbox()
 		m.SetDomain(domain)
 		m.SetMail(mn + "@" + domain)
-		m.SetPassword(domain)
+		m.SetPasswordWDefaultScheme(domain)
 		m.IsActive = true
 		m.Description.String = "filled automatically with default mailbox from config"
 		m.Description.Valid = true

@@ -53,15 +53,16 @@ func main() {
 	fmt.Println(`|______/|_____|__|__|__|__|___  ||_______||__.__|   __|__| |_____|_____|_____|   (..(")(")`)
 	fmt.Println(`                          |_____|               |__|                             `)
 
-	fmt.Println("")
-	fmt.Println("CLI based mailbox configuration for Postfix and Dovecot")
+	//	fmt.Println("")
+	//	fmt.Println("CLI based mailbox configuration for Postfix and Dovecot")
 	fmt.Println("(c) 2018-19 by SwordLord - the coding crew")
 	fmt.Println("")
 
 	// initialise the command structure
 	if err := cmd.RootCmd.Execute(); err != nil {
 
-		fmt.Println("Your command returned an error. You might want to run with --help.")
+		fmt.Println("[+] Your command returned an error. You might want to run with --help.")
+		fmt.Print("[-] ")
 		fmt.Println(err)
 
 		os.Exit(1)
@@ -70,4 +71,3 @@ func main() {
 
 // TODO: alias -> forward -> multi line, one line per address
 // TODO: @ in alias == catchall? -> fix in sql syntax
-// TODO: remove logrus, doesnt make sense in a cli tool...

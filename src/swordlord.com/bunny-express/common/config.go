@@ -124,6 +124,9 @@ var defaultConfig = []byte(`
     "file": "be.sqlite",
     "add_demo_data": "false"
   },
-  "default.alias": "info abuse"
+    "default": {
+    "alias": "info abuse",
+    "scheme": "MD5-CRYPT"
+  }
 }
 `)

@@ -44,10 +44,11 @@ var RootCmd = &cobra.Command{
 	SilenceUsage:  true, // only show help if explicitly requested
 	SilenceErrors: true, // we show errors on our own...
 	Version:       common.GetVersion(),
-	Short:         "bunny express, the CLI-based tool for postfix / dovecot user administration",
-	Long: `bunny express, the CLI-based tool for postfix / dovecot user administration
+	Short:         "bunnyexpress, the CLI-based tool for postfix & dovecot mailbox administration.",
+	Long: `bunnyexpress, the CLI-based tool for postfix & dovecot mailbox administration.
 
-With this tool you manage domains and mailboxes for your mail infrastructure. See help for more details.`,
+With bunnyexpress you can manage domains, mailboxes and aliases for your own mail domains and infrastructure. 
+Everything is stored within an SQLite3 database. See accompanied ReadMe and help for more details.`,
 }
 
 func init() {

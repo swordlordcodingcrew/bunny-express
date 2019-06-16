@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"strconv"
+	"swordlord.com/bunny-express/common"
 	"swordlord.com/bunny-express/db/mailbox"
 	"swordlord.com/bunny-express/util"
 )
@@ -81,20 +82,18 @@ func ListMailbox(cmd *cobra.Command, args []string) error {
 
 func AddMailbox(cmd *cobra.Command, args []string) error {
 
+	pwdScheme := checkSchemeFlag(cmd)
+
 	m := mailbox.NewMailbox()
 
 	m.SetMail(args[0])
-	m.SetPassword(args[1])
+	m.SetPassword(args[1], pwdScheme)
 	m.SetDomain(args[2])
 
 	m.SetMailDir("")
 	m.SetLocalPart("")
 
-	var q = sql.NullString{}
-	err := q.Scan("0")
-	if err == nil {
-		m.SetQuota(q)
-	}
+	m.SetQuota(0)
 
 	scanMailboxFlagsToObject(cmd, m)
 
@@ -138,7 +137,9 @@ func scanMailboxFlagsToObject(cmd *cobra.Command, m *mailbox.Mailbox) {
 	fPassword := cmd.Flag("password")
 	if fPassword != nil && fPassword.Changed {
 
-		m.SetPassword(fPassword.Value.String())
+		pwdScheme := checkSchemeFlag(cmd)
+
+		m.SetPassword(fPassword.Value.String(), pwdScheme)
 	}
 
 	fMaildir := cmd.Flag("maildir")
@@ -169,9 +170,32 @@ func scanMailboxFlagsToObject(cmd *cobra.Command, m *mailbox.Mailbox) {
 		var s = sql.NullString{}
 		err := s.Scan(fQuota.Value.String())
 		if err == nil {
-			m.SetQuota(s)
+			m.SetQuotaAsNullString(s)
 		}
 	}
+}
+
+func checkSchemeFlag(cmd *cobra.Command) string {
+
+	pwdScheme := common.GetStringFromConfig("default.scheme")
+	if pwdScheme == "" {
+
+		pwdScheme = "MD5-CRYPT"
+	}
+
+	fPwdScheme := cmd.Flag("pwdscheme")
+	if fPwdScheme != nil && fPwdScheme.Changed {
+
+		scheme := fPwdScheme.Value.String()
+		switch scheme {
+		case "md5crypt":
+			pwdScheme = "MD5-CRYPT"
+		case "bcrypt":
+			pwdScheme = "BLF-CRYPT"
+		}
+	}
+
+	return pwdScheme
 }
 
 func DeleteMailbox(cmd *cobra.Command, args []string) error {
@@ -211,6 +235,7 @@ func init() {
 	mailboxAddCmd.Flags().StringP("localpart", "l", "", "local part, better not change this")
 	mailboxAddCmd.Flags().StringP("relaydomain", "r", "", "relay domain")
 	mailboxAddCmd.Flags().StringP("quota", "q", "", "quota for this user")
+	mailboxAddCmd.Flags().StringP("pwdscheme", "s", "", "password hashing scheme to be used")
 
 	var mailboxEditCmd = &cobra.Command{
 		Use:   "edit [mailbox]",
@@ -226,6 +251,7 @@ func init() {
 	mailboxEditCmd.Flags().StringP("localpart", "l", "", "local part, better not change this")
 	mailboxEditCmd.Flags().StringP("relaydomain", "r", "", "relay domain")
 	mailboxEditCmd.Flags().StringP("quota", "q", "", "quota for this user")
+	mailboxEditCmd.Flags().StringP("pwdscheme", "s", "", "password hashing scheme to be used")
 
 	var mailboxDeleteCmd = &cobra.Command{
 		Use:   "delete [mailbox]",
