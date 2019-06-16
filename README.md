@@ -32,7 +32,7 @@ If you are looking for a lightweight and hassle free mail account management too
 
 ## Status ##
 
-**BunnyExpress** is currently in development. If you are adventurous, have a go with it.
+**BunnyExpress** is somewhat stable. Please have a go and send in your bug reports.
 
 
 ## Installation ##
