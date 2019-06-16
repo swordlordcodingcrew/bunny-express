@@ -65,6 +65,8 @@ func NewAlias() *Alias {
 	a := &Alias{}
 	a.clearDirtyFlags()
 	a.isNew = true
+	a.CrtDat = time.Now()
+	a.UpdDat = time.Now()
 
 	return a
 }
@@ -244,7 +246,7 @@ func (a *Alias) Persist() error {
 	}
 	defer db.Close()
 
-	if !a.IsDirty() {
+	if !a.IsDirty() && !a.isNew {
 		common.LogInfo("Alias did not change, not persisted.", nil)
 		return nil
 	}
@@ -301,6 +303,13 @@ func (a *Alias) add(db *sqlx.DB) error {
 		sFields += "active"
 		params = append(params, a.GetIsActive())
 	}
+
+	if len(sFields) > 0 {
+		sFields += ", "
+	}
+	sFields += "crt_dat, upd_dat"
+	params = append(params, a.CrtDat)
+	params = append(params, a.UpdDat)
 
 	// generate param string, remove last , from repeater
 	sQM := strings.Repeat("?,", len(params))
@@ -457,12 +466,14 @@ func FillDefaultAliasOnDomain(domain string) error {
 	for _, an := range aliases {
 
 		alias := NewAlias()
-		alias.Domain = domain
-		alias.Alias = an + "@" + domain
-		alias.ForwardAddress = "root@" + domain
-		alias.IsActive = true
-		alias.Description.String = "filled automatically with default alias from config"
-		alias.Description.Valid = true
+		alias.SetDomain(domain)
+		alias.SetAlias(an + "@" + domain)
+		alias.SetForwardAddress("root@" + domain)
+		alias.SetIsActive(true)
+
+		var desc sql.NullString
+		desc.Scan("filled automatically with default alias from config")
+		alias.SetDescription(desc)
 
 		err := alias.Persist()
 		if err != nil {

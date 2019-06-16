@@ -83,6 +83,8 @@ func NewMailbox() *Mailbox {
 	m.isNew = true
 	m.SetQuota(0)
 	m.SetIsActive(true)
+	m.CrtDat = time.Now()
+	m.UpdDat = time.Now()
 
 	return m
 }
@@ -354,7 +356,7 @@ func (m *Mailbox) Persist() error {
 	}
 	defer db.Close()
 
-	if !m.IsDirty() {
+	if !m.IsDirty() && !m.isNew {
 		common.LogInfo("Mailbox did not change, not persisted.", nil)
 		return nil
 	}
@@ -433,6 +435,13 @@ func (m *Mailbox) add(db *sqlx.DB) error {
 		sFields += "quota"
 		params = append(params, m.Quota.String)
 	}
+
+	if len(sFields) > 0 {
+		sFields += ", "
+	}
+	sFields += "crt_dat, upd_dat"
+	params = append(params, m.CrtDat)
+	params = append(params, m.UpdDat)
 
 	// generate param string, remove last , from repeater
 	sQM := strings.Repeat("?,", len(params))

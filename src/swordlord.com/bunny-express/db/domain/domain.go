@@ -65,6 +65,8 @@ func NewDomain() *Domain {
 	d.isNew = true
 	d.MailboxCount = 0
 	d.AliasCount = 0
+	d.CrtDat = time.Now()
+	d.UpdDat = time.Now()
 
 	return d
 }
@@ -253,7 +255,7 @@ func (d *Domain) Persist() error {
 	}
 	defer db.Close()
 
-	if !d.IsDirty() {
+	if !d.IsDirty() && !d.isNew {
 		common.LogInfo("Domain did not change, not persisted.", nil)
 		return nil
 	}
@@ -293,6 +295,13 @@ func (d *Domain) add(db *sqlx.DB) error {
 		sFields += "active"
 		params = append(params, d.GetIsActive())
 	}
+
+	if len(sFields) > 0 {
+		sFields += ", "
+	}
+	sFields += "crt_dat, upd_dat"
+	params = append(params, d.CrtDat)
+	params = append(params, d.UpdDat)
 
 	// generate param string, remove last , from repeater
 	sQM := strings.Repeat("?,", len(params))
