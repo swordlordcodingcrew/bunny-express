@@ -1,7 +1,13 @@
-Bunny Express
-======
+```
+ ______                           _______                                        
+|   __ \.--.--.-----.-----.--.--.|    ___|.--.--.-----.----.-----.-----.-----.    (\(\
+|   __ <|  |  |     |     |  |  ||    ___||_   _|  _  |   _|  -__|__ --|__ --|   ( =':')
+|______/|_____|__|__|__|__|___  ||_______||__.__|   __|__| |_____|_____|_____|   (..(")(")
+                          |_____|               |__|                             
+```
 
 **BunnyExpress** (c) 2018-19 by [SwordLord - the coding crew](http://www.swordlord.com/)
+
 
 ## Introduction ##
 
@@ -17,11 +23,11 @@ We started with **BunnyExpress** because of two reasons:
 
 - We always try to reduce the attack surface on our servers. Running a DB server as well as a web server with PHP enabled and world accessible admin scripts is not necessarily the strategy we prefer for our own systems.
 
-- Running a web server, a DBMS and PHP on a system just to manage a few records is not what we necessarily call lightweight. And besides, it is a pain to set up and administrate.
+- Running a web server, a DBMS and PHP on a system just to manage a few records is not what we would call lightweight. And besides, it is a pain to set up and administrate.
 
 We try to address both points with **BunnyExpress**. A small CLI based tool to edit and manage domains, mailboxes and aliases, which are stored in a single SQLite3 DB.
 
-If you are looking for a lightweight and hassle free mail account management tool, **BunnyExpress** might be for you.
+If you are looking for a lightweight and hassle free mail account management tool for postfix and dovecot, **BunnyExpress** might be for you.
 
 
 ## Status ##
