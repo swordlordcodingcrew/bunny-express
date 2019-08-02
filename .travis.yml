@@ -2,7 +2,7 @@ language: go
 sudo: false
 
 go:
-  - "1.10"
+  - "1.11"
 
 env:
   global:
@@ -70,7 +70,7 @@ deploy:
   file:
     - build/be-v$VERSION
   api_key:
-    secure: = xxx
+    secure: F9LgsCbQu2Syt0UObcS/bnsdQzQb64qG4YE+DurdZ+qd9vwrG7rPWmLZ6kXagpvIVusmLDoxtUDZ9lY09qeC9uHqHa8a1nxU0J+4Ngi22kNisR41m+s+SSuQV02SaYoKJV6bPyF5bGCKZN4NXusipEbxUOSvxTSIWGw+2utI58pY21TBuAQMS8UqZV2v1NK5XLIwIT4w7ra90cBgSvsam6LNYDoiNVyikPL7hkoai4gzVwByAdkCttYMHj2U3HSPMDRPVzUJr9fAfK34wV55ZK55xxQfSbG5oyXLN7H/ak1rZjmyMTbS6VhMdumiCHkwLdTzvZ7eHiban/WA3w57juy/ZEtKuJU5koC6oZfbNwNc/mlUW1Ulj/Ahh83VXZAdP0P2H6bIWndZbQsQJNzwDHm9sKbQeiTdcNe6BsJBqMNC6d0w/X0PZgctrrhE+LyAxEgrianXrSs1/tDu72yAufbu9MdpjKef/X+8BKRFbmx2aCi5JHBOKoCMHMWebTC17eSe6N+O6011GVNyHe19eCF2LAV1hfFx1PfA8Xf0/C7im1N7FX2d2R0Jxr0GE23sLz4M7OP6HX3fkDS2R4R+U6AWvrZeH2Hq8glskq7ITo7H56J4KJz7Dvd/0yVZLtTCG1pQizumlpy2g9OGh7Pdv1fHnD0cS3/NLOOivd3E9oE=
   skip_cleanup: true
   on:
     tags: false
